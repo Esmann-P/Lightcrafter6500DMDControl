@@ -144,6 +144,12 @@ class LC6500Device(USBhidDevice):
         self.__set_mode('normal_video')
         self.__set_video_source_mode(video_source)
 
+    def power_mode(self, mode):
+        mode_dict = {'reset':0x02, 'standby':0x01, 'normal': 0x00}
+        assert mode in mode_dict.keys()
+        data = [mode_dict[mode]]
+        self.dmd_command('w',True,0x99,0x02,0x00,data)
+
     def start_stop_sequence(self,cmd):
         """
         :param cmd - string either 'start', 'stop' or 'pause'
@@ -197,6 +203,13 @@ class LC6500Device(USBhidDevice):
         self.dmd_command('w', True, 0x43, 0x1a, 0x35, trigger_delay_bytes + rising_edge_bit)
         self.check_for_errors()
 
+    def trigger_out_1_config(self, trigger_on_delay =  50,trigger_off_delay = -20): # us
+        trigger_on_delay_bytes = hh.int2reversed_hex_array(trigger_on_delay, n_bytes = 2)
+        trigger_off_delay_bytes = hh.int2reversed_hex_array(trigger_off_delay, n_bytes = 2)
+        trigger_inversion = 0x00 # for inverted trigger set equal to 0x01
+        data = trigger_inversion + trigger_on_delay_bytes + trigger_off_delay_bytes
+        self.dmd_command('w', True, 0x43, 0x1a, 0x1e, data)
+
     def pattern_def_cmd(self, pattern_index, exposure_time = 105, dark_time = 0, is_wait_for_trig = True):
         assert pattern_index < 256 and pattern_index >= 0 
 
@@ -223,6 +236,8 @@ class LC6500Device(USBhidDevice):
         for idx, dmd_pattern in enumerate(dmd_pattern_sequence['patterns']):
             self.pattern_def_cmd(idx, exposure_time=dmd_pattern.exposure_time, dark_time=dmd_pattern.dark_time )
 
+        self.pattern_display_lut_definition(len(dmd_pattern_sequence['patterns']),dmd_pattern_sequence.pop('num_repeats', 0))
+
         for idx, dmd_pattern in reversed(list(enumerate(dmd_pattern_sequence['patterns']))):
             image_bits = dmd_pattern.compress_pattern()
             self.bmp_load(np.size(image_bits), index=idx)
@@ -231,9 +246,9 @@ class LC6500Device(USBhidDevice):
             
         print "The number of patterns is %s"%len(dmd_pattern_sequence['patterns'])
         
-        self.pattern_display_lut_definition(len(dmd_pattern_sequence['patterns']),dmd_pattern_sequence.pop('num_repeats', 0))
 
         self.trigger_1_config(105)
+        self.trigger_out_1_config()
         self.start_stop_sequence('start')
 
         print "Finished Upload Process"
