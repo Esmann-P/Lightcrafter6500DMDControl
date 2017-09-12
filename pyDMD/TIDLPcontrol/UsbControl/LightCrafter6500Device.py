@@ -7,6 +7,8 @@ import os
 import numpy as np
 import HexHelper as hh
 from UsbDevice import USBhidDevice
+import PatternCreation as pc
+from scipy.misc import imread
 import time
 
 if os.name == 'nt':
@@ -149,6 +151,8 @@ class LC6500Device(USBhidDevice):
         assert mode in mode_dict.keys()
         data = [mode_dict[mode]]
         self.dmd_command('w',True,0x99,0x02,0x00,data)
+        if mode == 'standby':
+		self.release()
 
     def start_stop_sequence(self,cmd):
         """
@@ -186,7 +190,6 @@ class LC6500Device(USBhidDevice):
         print self.check_for_errors()
 
     def pattern_display_lut_definition(self, num_patterns, num_repeat = 0):
-        assert num_patterns < 256
         print "configuring lookup table"
         num_patterns_bytes = hh.int2reversed_hex_array(num_patterns, n_bytes=2)
         num_repeats_bytes = hh.int2reversed_hex_array(num_repeat, n_bytes=4)
@@ -206,12 +209,12 @@ class LC6500Device(USBhidDevice):
     def trigger_out_1_config(self, trigger_on_delay =  50,trigger_off_delay = -20): # us
         trigger_on_delay_bytes = hh.int2reversed_hex_array(trigger_on_delay, n_bytes = 2)
         trigger_off_delay_bytes = hh.int2reversed_hex_array(trigger_off_delay, n_bytes = 2)
-        trigger_inversion = 0x00 # for inverted trigger set equal to 0x01
+        trigger_inversion = [0x00] # for inverted trigger set equal to [0x01]
         data = trigger_inversion + trigger_on_delay_bytes + trigger_off_delay_bytes
         self.dmd_command('w', True, 0x43, 0x1a, 0x1e, data)
 
     def pattern_def_cmd(self, pattern_index, exposure_time = 105, dark_time = 0, is_wait_for_trig = True):
-        assert pattern_index < 256 and pattern_index >= 0 
+        assert pattern_index >= 0 
 
         pattern_index_bytes = hh.int2reversed_hex_array(pattern_index, 2)
         exposure_bytes = hh.int2reversed_hex_array(exposure_time, 3)
@@ -234,7 +237,7 @@ class LC6500Device(USBhidDevice):
         self.set_pattern_on_the_fly()
         
         for idx, dmd_pattern in enumerate(dmd_pattern_sequence['patterns']):
-            self.pattern_def_cmd(idx, exposure_time=dmd_pattern.exposure_time, dark_time=dmd_pattern.dark_time )
+            self.pattern_def_cmd(idx, exposure_time=dmd_pattern.exposure_time, dark_time=dmd_pattern.dark_time, is_wait_for_trig = dmd_pattern.trigger)
 
         self.pattern_display_lut_definition(len(dmd_pattern_sequence['patterns']),dmd_pattern_sequence.pop('num_repeats', 0))
 
@@ -282,8 +285,8 @@ class LC6500Device(USBhidDevice):
 
         # Send full command groups
         for cmd_group_index in range(num_full_cmd_groups):  
-            if cmd_group_index % 50 == 0:
-                print "sending packet group %s" % cmd_group_index
+#            if cmd_group_index % 50 == 0:
+#                print "sending packet group %s" % cmd_group_index
             self.send_image_command_with_slaves(image_bits[0+cmd_group_index*max_cmd_payload:max_cmd_payload+cmd_group_index*max_cmd_payload],
                                                 cmd_group_index)
         # Send remainder
@@ -348,6 +351,34 @@ class LC6500Device(USBhidDevice):
                     print "slave rng %s, %s"%(64*k, 64*(k+1))
                     print "length %s"%len(slave_bits[64*k:64*k+64].tolist())
                 self.raw_command(slave_bits[64*k:64*k+64].tolist())
+
+    def pattern_on_the_fly(self, pattern_list):
+        #Prepare Pattern
+        list_of_patterns = []
+        for lines in pattern_list:
+            path = lines[0]
+       	    exposure = int(lines[1])
+            is_wait_for_trigger = lines[2]
+            settings = {
+       	                'compression':'rle',
+               	        'exposure_time':exposure, # in us
+                        'trigger':is_wait_for_trigger
+                        }
+            
+            dmd_pattern = pc.DMDPattern(**settings)
+       	    picture = imread(path)
+            picture_change = picture.astype('bool')
+       	    dmd_pattern.pattern = picture_change
+            list_of_patterns.append(dmd_pattern)
+            
+
+        dmd_patterns = {'patterns': list_of_patterns}
+        start_time = time.clock()
+        self.upload_image_sequence(dmd_patterns)
+        end_time = time.clock()
+        elapsed_time = end_time - start_time
+        print "Time it took to send images:" , elapsed_time
+        self.release()
 
 if __name__ == '__main__':
     lc_dmd = LC6500Device()

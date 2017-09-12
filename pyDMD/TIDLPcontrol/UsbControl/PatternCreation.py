@@ -4,7 +4,7 @@ Created on Mar 3, 2016
 @author: anton
 '''
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import HexHelper as hh
 
 
@@ -22,6 +22,7 @@ class DMDPattern(object):
         self.exposure_time = kwargs.pop('exposure_time', 105)
         self.dark_time = kwargs.pop('dark_time', 0)
         self.bit_depth = kwargs.pop('bit_depth', 1) 
+        self.trigger = kwargs.pop('trigger', True)
 
         self.X, self.Y = np.meshgrid(np.arange(self.resolution[0]) - self.zero_point[0],
                                      np.arange(self.resolution[1]) - self.zero_point[1])
