@@ -211,7 +211,7 @@ class LC6500Device(USBhidDevice):
         trigger_off_delay_bytes = hh.int2reversed_hex_array(trigger_off_delay, n_bytes = 2)
         trigger_inversion = [0x00] # for inverted trigger set equal to [0x01]
         data = trigger_inversion + trigger_on_delay_bytes + trigger_off_delay_bytes
-        self.dmd_command('w', True, 0x43, 0x1a, 0x1e, data)
+        self.dmd_command('w', True, 0x43, 0x1a, 0x1d, data)
 
     def pattern_def_cmd(self, pattern_index, exposure_time = 105, dark_time = 0, is_wait_for_trig = True):
         assert pattern_index >= 0 
