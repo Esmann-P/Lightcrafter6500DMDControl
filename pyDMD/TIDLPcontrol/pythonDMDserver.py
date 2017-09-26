@@ -53,8 +53,7 @@ def dataTransfer(conn):
             print "We have entered the LOAD statement"
             lc_dmd = lc.LC6500Device()
             pattern_list = list(ast.literal_eval(dataMessage[1])) # typeset string to array
-            lc_dmd.pattern_on_the_fly(pattern_list)
-            reply = "Patterns succesfully uploaded. DMD ready to use."
+            reply = lc_dmd.pattern_on_the_fly(pattern_list)
 
         elif command == 'KILL':
             lc_dmd = lc.LC6500Device()

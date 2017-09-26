@@ -355,30 +355,38 @@ class LC6500Device(USBhidDevice):
     def pattern_on_the_fly(self, pattern_list):
         #Prepare Pattern
         list_of_patterns = []
+        list_of_broken_paths = []
         for lines in pattern_list:
             path = lines[0]
-       	    exposure = int(lines[1])
-            is_wait_for_trigger = lines[2]
-            settings = {
-       	                'compression':'rle',
-               	        'exposure_time':exposure, # in us
-                        'trigger':is_wait_for_trigger
-                        }
-            
-            dmd_pattern = pc.DMDPattern(**settings)
-       	    picture = imread(path)
-            picture_change = picture.astype('bool')
-       	    dmd_pattern.pattern = picture_change
-            list_of_patterns.append(dmd_pattern)
-            
+            if not os.path.exists(path):
+                list_of_broken_paths.append(path)
+        if list_of_broken_paths: # In Python, empty lists are False
+            return "The following list of paths are broken %s" % list_of_broken_paths
+        else:
+            for lines in pattern_list:
+                path = lines[0]
+       	        exposure = int(lines[1])
+                is_wait_for_trigger = lines[2]
+                settings = {
+                            'compression':'rle',
+                            'exposure_time':exposure, # in us
+                            'trigger':is_wait_for_trigger
+                           }
+                dmd_pattern = pc.DMDPattern(**settings)
+       	        picture = imread(path)
+	        picture_change = picture.astype('bool')
+                dmd_pattern.pattern = picture_change
+	        list_of_patterns.append(dmd_pattern)
 
-        dmd_patterns = {'patterns': list_of_patterns}
-        start_time = time.clock()
-        self.upload_image_sequence(dmd_patterns)
-        end_time = time.clock()
-        elapsed_time = end_time - start_time
-        print "Time it took to send images:" , elapsed_time
-        self.release()
+
+            dmd_patterns = {'patterns': list_of_patterns}
+            start_time = time.clock()
+            self.upload_image_sequence(dmd_patterns)
+            end_time = time.clock()
+            elapsed_time = end_time - start_time
+            print "Time it took to send images:" , elapsed_time
+            self.release()
+            return "Patterns succesfully uploaded. DMD ready to use."
 
 if __name__ == '__main__':
     lc_dmd = LC6500Device()
